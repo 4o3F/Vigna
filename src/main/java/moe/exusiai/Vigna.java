@@ -4,6 +4,8 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Vigna extends JavaPlugin {
     public static File folder;
@@ -11,7 +13,9 @@ public class Vigna extends JavaPlugin {
 
     public static String certname;
     public static String certpassword;
-    public static String domain;
+    public static Integer port;
+    public static Map<String, Object> proxyFolder;
+    public static Map<String, Object> proxyHost;
     @Override
     public void onEnable() {
         folder = this.getDataFolder();
@@ -21,8 +25,9 @@ public class Vigna extends JavaPlugin {
 
         certname = config.getString("cert.name");
         certpassword = config.getString("cert.password");
-        domain = config.getString("domain");
-
+        port = config.getInt("port");
+        proxyFolder = config.getConfigurationSection("proxyFolder").getValues(false);
+        proxyHost = config.getConfigurationSection("proxyHost").getValues(false);
 
         try {
             ReverseProxyServer.StartProxyServer();

@@ -1,3 +1,8 @@
 cert:
   name: "pkcs.p12"
   password: "passout"
+port: 21068
+proxyFolder:
+  gameserver: "http://127.0.0.1:10000"
+proxyHost:
+  gameserver: "http://127.0.0.1:10000"

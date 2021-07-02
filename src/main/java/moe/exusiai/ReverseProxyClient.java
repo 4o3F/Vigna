@@ -1,6 +1,7 @@
 package moe.exusiai;
 
 import com.google.common.collect.ImmutableMap;
+import com.sun.jndi.toolkit.url.Uri;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.UndertowClient;
@@ -24,12 +25,14 @@ public class ReverseProxyClient implements ProxyClient {
     };
 
     private final UndertowClient client;
-    private final ImmutableMap<String, URI> mapping;
+    private final ImmutableMap<String, URI> foldermapping;
+    private final ImmutableMap<String, URI> hostmapping;
     private final URI defaultTarget;
 
-    public ReverseProxyClient(ImmutableMap<String, URI> mapping, URI defaultTarget) {
+    public ReverseProxyClient(ImmutableMap<String, URI> foldermapping, ImmutableMap<String, URI> hostmapping, URI defaultTarget) {
         this.client = UndertowClient.getInstance();
-        this.mapping = mapping;
+        this.foldermapping = foldermapping;
+        this.hostmapping = hostmapping;
         this.defaultTarget = defaultTarget;
     }
 
@@ -41,32 +44,36 @@ public class ReverseProxyClient implements ProxyClient {
     @Override
     public void getConnection(ProxyTarget target, HttpServerExchange exchange, ProxyCallback<ProxyConnection> callback, long timeout, TimeUnit timeUnit) {
         URI targetUri = defaultTarget;
-
-        String[] uri = exchange.getRequestURI().split("/",3);
-
-        String firstUriSegment = uri[1];
-        String remaininguri;
-        if (uri.length > 2) {
-            remaininguri = "/" + uri[2];
+        String host = exchange.getHostAndPort().split(":")[0];
+        if (hostmapping.containsKey(host)) {
+            targetUri = hostmapping.get(host);
         } else {
-            remaininguri = "/";
+
+            String[] uri = exchange.getRequestURI().split("/", 3);
+
+            String firstUriSegment = uri[1];
+            String remaininguri;
+            if (uri.length > 2) {
+                remaininguri = "/" + uri[2];
+            } else {
+                remaininguri = "/";
+            }
+
+            if (foldermapping.containsKey(firstUriSegment)) {
+                // If the first uri segment is in the mapping, update the targetUri
+                targetUri = foldermapping.get(firstUriSegment);
+                // Strip the request uri from the part that is used to map upon.
+                exchange.setRequestURI(remaininguri);
+            }
         }
 
-        if (mapping.containsKey(firstUriSegment)) {
-            // If the first uri segment is in the mapping, update the targetUri
-            targetUri = mapping.get(firstUriSegment);
-            // Strip the request uri from the part that is used to map upon.
-            exchange.setRequestURI(remaininguri);
-        }
+            client.connect(
+                    new ConnectNotifier(callback, exchange),
+                    targetUri,
+                    exchange.getIoThread(),
+                    exchange.getConnection().getByteBufferPool(),
+                    OptionMap.EMPTY);
 
-
-
-        client.connect(
-                new ConnectNotifier(callback, exchange),
-                targetUri,
-                exchange.getIoThread(),
-                exchange.getConnection().getByteBufferPool(),
-                OptionMap.EMPTY);
     }
 
     private final class ConnectNotifier implements ClientCallback<ClientConnection> {
